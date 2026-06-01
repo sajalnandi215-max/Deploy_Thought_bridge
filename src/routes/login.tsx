@@ -33,7 +33,7 @@ function Login() {
       <div className="p-6">
         <Logo />
       </div>
-
+ 
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md animate-slide-up">
 
