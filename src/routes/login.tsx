@@ -1,42 +1,125 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Mail, Lock } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { signInWithPopup } from "firebase/auth";
+import {
+  signInWithPopup,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
+import { useState } from "react";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Join ThoughtBridge" }, { name: "description", content: "Continue as guest or create an anonymous account." }] }),
+  head: () => ({
+    meta: [
+      { title: "Join ThoughtBridge" },
+      {
+        name: "description",
+        content: "Continue as guest or create an anonymous account.",
+      },
+    ],
+  }),
   component: Login,
 });
 
 function Login() {
+  const navigate = useNavigate();
 
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // -------------------------
+  // Google Login
+  // -------------------------
   const handleGoogleLogin = async () => {
     try {
+      setLoading(true);
+
       const result = await signInWithPopup(auth, googleProvider);
 
-      console.log("User Logged In:", result.user);
+      console.log("Google user:", result.user.email);
 
-      alert(`Welcome ${result.user.displayName}`);
-
-      window.location.href = "/interests";
-
-    } catch (error: any) {
-      console.error("Firebase Error:", error);
-
-      alert(error.message);
+      navigate({ to: "/interests" });
+    } catch (error) {
+      console.error(error);
+      alert("Google login failed");
+    } finally {
+      setLoading(false);
     }
   };
 
+  // -------------------------
+  // Create Account
+  // -------------------------
+  const handleCreateAccount = async () => {
+    if (!email || !password) {
+      alert("Please enter email and password");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      console.log("Created user:", userCredential.user.email);
+
+      navigate({ to: "/interests" });
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || "Account creation failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // -------------------------
+  // Login
+  // -------------------------
+  const handleLogin = async () => {
+  console.log("Login clicked");
+
+  if (!email || !password) {
+    alert("Please enter email and password");
+    return;
+  }
+
+  try {
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
+    console.log("LOGIN SUCCESS:", userCredential.user);
+
+    alert(`Welcome back ${userCredential.user.email}`);
+
+    window.location.href = "/interests";
+  } catch (error: any) {
+    console.error("LOGIN ERROR:", error);
+
+    alert(error.message);
+  }
+};
+
   return (
     <div className="min-h-screen bg-background bg-mesh flex flex-col">
+      {/* Logo */}
       <div className="p-6">
         <Logo />
       </div>
- 
+
+      {/* Main */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md animate-slide-up">
-
+          
+          {/* Heading */}
           <div className="text-center mb-8">
             <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight">
               Welcome, stranger.
@@ -46,8 +129,10 @@ function Login() {
             </p>
           </div>
 
+          {/* Card */}
           <div className="rounded-3xl glass p-7 shadow-card">
 
+            {/* Guest Login */}
             <Link
               to="/interests"
               className="group flex items-center justify-between w-full p-4 rounded-2xl bg-gradient-brand text-white shadow-glow hover:scale-[1.01] transition"
@@ -62,20 +147,19 @@ function Login() {
               <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition" />
             </Link>
 
+            {/* Divider */}
             <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
               <div className="h-px flex-1 bg-border" />
               OR
               <div className="h-px flex-1 bg-border" />
             </div>
 
+            {/* Google Login */}
             <button
-                onClick={() => {
-                  console.log("Button clicked");
-                  alert("Button clicked");
-                  handleGoogleLogin();
-                }}
-                className="w-full h-11 rounded-xl border border-border bg-card hover:bg-accent font-medium flex items-center justify-center gap-3 transition"
-              >
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="w-full h-11 rounded-xl border border-border bg-card hover:bg-accent font-medium flex items-center justify-center gap-3 transition disabled:opacity-50"
+            >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
@@ -98,41 +182,58 @@ function Login() {
               Continue with Google
             </button>
 
+            {/* Inputs */}
             <div className="mt-5 space-y-3">
 
+              {/* Email */}
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
 
                 <input
                   type="email"
                   placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full h-11 rounded-xl bg-muted/50 border border-border pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
 
+              {/* Password */}
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
 
                 <input
                   type="password"
                   placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full h-11 rounded-xl bg-muted/50 border border-border pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
 
+              {/* Buttons */}
               <div className="grid grid-cols-2 gap-3">
-                <button className="h-11 rounded-xl border border-border hover:bg-accent text-sm font-semibold transition">
-                  Login
-                </button>
+               <button
+                type="button"
+                onClick={handleLogin}
+                disabled={loading}
+                className="h-11 rounded-xl border border-border hover:bg-accent text-sm font-semibold transition disabled:opacity-50"
+              >
+                {loading ? "Logging in..." : "Login"}
+              </button>
 
-                <button className="h-11 rounded-xl bg-foreground text-background hover:opacity-90 text-sm font-semibold transition">
+                <button
+                  onClick={handleCreateAccount}
+                  disabled={loading}
+                  className="h-11 rounded-xl bg-foreground text-background hover:opacity-90 text-sm font-semibold transition disabled:opacity-50"
+                >
                   Create Account
                 </button>
               </div>
-
             </div>
           </div>
 
+          {/* Footer */}
           <p className="mt-6 text-center text-xs text-muted-foreground">
             By continuing you agree to be kind. The rest is on us.
           </p>
