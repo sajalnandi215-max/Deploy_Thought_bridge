@@ -6,7 +6,7 @@ export function Logo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   return (
     <Link to="/" className="flex items-center gap-2.5 group">
       <div className={`${box} relative rounded-xl bg-gradient-brand flex items-center justify-center shadow-glow transition-transform group-hover:scale-105`}>
-        <svg viewBox="0 0 24 24" className="h-1/2 w-1/2 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg viewBox="0 0 24 24" className="h-1/2 w-1/2 text-white." fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M4 18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6a2 2 0 0 0-2 2z" />
           <path d="M8 13h8M8 17h5" />
         </svg>
