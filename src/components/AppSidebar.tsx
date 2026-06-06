@@ -1,6 +1,9 @@
+import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Compass, MessageCircle, Users, Sparkles, Bell, User, Settings, Home } from "lucide-react";
 import { Logo } from "./Logo";
+import { auth, db } from "@/lib/firebase"; // Ensure db is exported from firebase.ts
+import { doc, onSnapshot } from "firebase/firestore";
 
 const nav = [
   { to: "/", label: "Home", icon: Home },
@@ -12,7 +15,28 @@ const nav = [
 ];
 
 export function AppSidebar() {
+  const [profile, setProfile] = useState<any>(null);
   const path = useRouterState({ select: (r) => r.location.pathname });
+
+  useEffect(() => {
+    // Listen to Auth State to get the current UID
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        // Subscribe to real-time updates for this specific user in Firestore
+        const unsub = onSnapshot(doc(db, "users", user.uid), (doc) => {
+          if (doc.exists()) {
+            setProfile(doc.data());
+          }
+        });
+        return () => unsub();
+      } else {
+        setProfile(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   return (
     <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-4 gap-1 sticky top-0 h-screen">
       <div className="px-2 py-3">
@@ -42,12 +66,24 @@ export function AppSidebar() {
           );
         })}
       </div>
+      
+      {/* Dynamic Profile Section */}
       <div className="mt-auto rounded-2xl glass p-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-gradient-brand flex items-center justify-center text-lg">🦊</div>
+          <div className="h-10 w-10 rounded-full bg-gradient-brand flex items-center justify-center text-lg overflow-hidden">
+            {profile?.avatar?.startsWith('http') ? (
+              <img src={profile.avatar} alt="Profile" className="h-full w-full object-cover" />
+            ) : (
+              profile?.avatar || "🦊"
+            )}
+          </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold truncate">Stranger #482</p>
-            <p className="text-xs text-muted-foreground">Reputation 842</p>
+            <p className="text-sm font-semibold truncate">
+              {profile?.displayName || "Stranger #482"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Reputation {profile?.reputation ?? 842}
+            </p>
           </div>
           <Settings className="h-4 w-4 text-muted-foreground ml-auto" />
         </div>

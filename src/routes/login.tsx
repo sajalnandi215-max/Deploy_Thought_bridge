@@ -6,7 +6,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
+import { auth, googleProvider, db } from "@/lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useState } from "react";
 
 export const Route = createFileRoute("/login")({
@@ -29,17 +30,36 @@ function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Sync user profile to Firestore
+  const syncUserToFirestore = async (user: any) => {
+    if (!user || !user.uid) return;
+
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) {
+      await setDoc(userRef, {
+        displayName: user.displayName || "New Stranger",
+        avatar: user.photoURL || "🦊",
+        joinDate: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        reputation: 0,
+        badges: 0,
+        conversations: 0,
+        roomsJoined: 0,
+      });
+      console.log("New user document created in Firestore");
+    }
+  };
+
   // -------------------------
   // Google Login
   // -------------------------
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
-
       const result = await signInWithPopup(auth, googleProvider);
-
+      await syncUserToFirestore(result.user);
       console.log("Google user:", result.user.email);
-
       navigate({ to: "/interests" });
     } catch (error) {
       console.error(error);
@@ -60,15 +80,13 @@ function Login() {
 
     try {
       setLoading(true);
-
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
         password
       );
-
+      await syncUserToFirestore(userCredential.user);
       console.log("Created user:", userCredential.user.email);
-
       navigate({ to: "/interests" });
     } catch (error: any) {
       console.error(error);
@@ -82,31 +100,31 @@ function Login() {
   // Login
   // -------------------------
   const handleLogin = async () => {
-  console.log("Login clicked");
+    console.log("Login clicked");
 
-  if (!email || !password) {
-    alert("Please enter email and password");
-    return;
-  }
+    if (!email || !password) {
+      alert("Please enter email and password");
+      return;
+    }
 
-  try {
-    const userCredential = await signInWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-
-    console.log("LOGIN SUCCESS:", userCredential.user);
-
-    alert(`Welcome back ${userCredential.user.email}`);
-
-    window.location.href = "/interests";
-  } catch (error: any) {
-    console.error("LOGIN ERROR:", error);
-
-    alert(error.message);
-  }
-};
+    try {
+      setLoading(true);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      await syncUserToFirestore(userCredential.user);
+      console.log("LOGIN SUCCESS:", userCredential.user);
+      alert(`Welcome back ${userCredential.user.email}`);
+      window.location.href = "/interests";
+    } catch (error: any) {
+      console.error("LOGIN ERROR:", error);
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background bg-mesh flex flex-col">
