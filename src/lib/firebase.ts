@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore"; // Ensure this is here
 
 const firebaseConfig = {
@@ -17,3 +17,12 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app); // THIS IS THE LINE IT IS MISSING
 export const googleProvider = new GoogleAuthProvider();
+
+// Ensure auth persistence is set to local in browser environments so users stay logged in across reloads
+if (typeof window !== "undefined") {
+  setPersistence(auth, browserLocalPersistence).catch((err) => {
+    // Non-fatal: log and continue
+    // eslint-disable-next-line no-console
+    console.warn("Failed to set Firebase auth persistence:", err);
+  });
+}

@@ -3,12 +3,16 @@ import { ArrowRight, Mail, Lock } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import {
   signInWithPopup,
+  signInAnonymously,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
 } from "firebase/auth";
 import { auth, googleProvider, db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -30,6 +34,16 @@ function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        navigate({ to: "/feed" });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [navigate]);
+
   // Sync user profile to Firestore
   const syncUserToFirestore = async (user: any) => {
     if (!user || !user.uid) return;
@@ -37,10 +51,13 @@ function Login() {
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
 
+    const avatar = user.photoURL || "🦊";
+    const displayName = user.displayName || "New Stranger";
+
     if (!userSnap.exists()) {
       await setDoc(userRef, {
-        displayName: user.displayName || "New Stranger",
-        avatar: user.photoURL || "🦊",
+        displayName,
+        avatar,
         joinDate: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
         reputation: 0,
         badges: 0,
@@ -48,6 +65,23 @@ function Login() {
         roomsJoined: 0,
       });
       console.log("New user document created in Firestore");
+      return;
+    }
+
+    const existingData = userSnap.data() || {};
+    const updates: any = {};
+
+    if (existingData.displayName !== displayName) {
+      updates.displayName = displayName;
+    }
+
+    if (existingData.avatar !== avatar) {
+      updates.avatar = avatar;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await setDoc(userRef, updates, { merge: true });
+      console.log("Updated user profile avatar/displayName in Firestore");
     }
   };
 
@@ -57,13 +91,33 @@ function Login() {
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
+      await setPersistence(auth, browserLocalPersistence);
       const result = await signInWithPopup(auth, googleProvider);
       await syncUserToFirestore(result.user);
       console.log("Google user:", result.user.email);
-      navigate({ to: "/interests" });
+      navigate({ to: "/onboarding" });
     } catch (error) {
       console.error(error);
       alert("Google login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // -------------------------
+  // Guest Login (Anonymous)
+  // -------------------------
+  const handleGuestLogin = async () => {
+    try {
+      setLoading(true);
+      await setPersistence(auth, browserLocalPersistence);
+      const result = await signInAnonymously(auth);
+      await syncUserToFirestore(result.user);
+      console.log("Guest user created:", result.user.uid);
+      navigate({ to: "/onboarding" });
+    } catch (error) {
+      console.error(error);
+      alert("Failed to continue as guest");
     } finally {
       setLoading(false);
     }
@@ -80,6 +134,7 @@ function Login() {
 
     try {
       setLoading(true);
+      await setPersistence(auth, browserLocalPersistence);
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -87,7 +142,7 @@ function Login() {
       );
       await syncUserToFirestore(userCredential.user);
       console.log("Created user:", userCredential.user.email);
-      navigate({ to: "/interests" });
+      navigate({ to: "/onboarding" });
     } catch (error: any) {
       console.error(error);
       alert(error.message || "Account creation failed");
@@ -109,6 +164,7 @@ function Login() {
 
     try {
       setLoading(true);
+      await setPersistence(auth, browserLocalPersistence);
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
@@ -117,7 +173,7 @@ function Login() {
       await syncUserToFirestore(userCredential.user);
       console.log("LOGIN SUCCESS:", userCredential.user);
       alert(`Welcome back ${userCredential.user.email}`);
-      window.location.href = "/interests";
+      navigate({ to: "/onboarding" });
     } catch (error: any) {
       console.error("LOGIN ERROR:", error);
       alert(error.message);
@@ -151,9 +207,10 @@ function Login() {
           <div className="rounded-3xl glass p-7 shadow-card">
 
             {/* Guest Login */}
-            <Link
-              to="/interests"
-              className="group flex items-center justify-between w-full p-4 rounded-2xl bg-gradient-brand text-white shadow-glow hover:scale-[1.01] transition"
+            <button
+              onClick={handleGuestLogin}
+              disabled={loading}
+              className="group flex items-center justify-between w-full p-4 rounded-2xl bg-gradient-brand text-white shadow-glow hover:scale-[1.01] transition disabled:opacity-50"
             >
               <div className="text-left">
                 <p className="font-semibold">Continue as Guest</p>
@@ -163,12 +220,12 @@ function Login() {
               </div>
 
               <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition" />
-            </Link>
+            </button>
 
             {/* Divider */}
             <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
               <div className="h-px flex-1 bg-border" />
-              OR
+              <span>OR</span>
               <div className="h-px flex-1 bg-border" />
             </div>
 
